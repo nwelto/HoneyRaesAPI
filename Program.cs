@@ -33,6 +33,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.MapGet("/servicetickets", () =>
+{
+    return serviceTickets;
+});
+
 
 app.MapGet("/servicetickets/{id}", (int id) =>
 {
@@ -53,6 +58,16 @@ app.MapPost("/servicetickets", (ServiceTicket serviceTicket) =>
     serviceTickets.Add(serviceTicket);
     return serviceTicket;
 });
+
+app.MapDelete("/servicetickets/{id}", (int id) =>
+{
+    var serviceTicket = serviceTickets.FirstOrDefault(st => st.Id == id);
+    if (serviceTicket != null)
+    {
+        serviceTickets.Remove(serviceTicket);
+    }
+});
+
 
 app.MapGet("/employees/{id}", (int id) =>
 {
