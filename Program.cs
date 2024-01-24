@@ -47,6 +47,13 @@ app.MapGet("/servicetickets/{id}", (int id) =>
     return Results.Ok(serviceTicket);
 });
 
+app.MapPost("/servicetickets", (ServiceTicket serviceTicket) =>
+{
+    serviceTicket.Id = serviceTickets.Max(st => st.Id) + 1;
+    serviceTickets.Add(serviceTicket);
+    return serviceTicket;
+});
+
 app.MapGet("/employees/{id}", (int id) =>
 {
     Employee employee = employees.FirstOrDefault(e => e.Id == id);
