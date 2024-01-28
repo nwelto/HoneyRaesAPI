@@ -207,6 +207,13 @@ app.MapPost("/servicetickets/{id}/complete", (int id) =>
     return Results.Ok(ticketToComplete);
 });
 
+app.MapGet("/servicetickets/emergencies", () =>
+{
+    return serviceTickets.Where(ticket => ticket.Emergency).ToList();
+});
+
+
+
 
 
 app.Run();
