@@ -1,20 +1,86 @@
 using HoneyRaesAPI.Models;
-List<Customer> customers = new List<Customer> {
-    new Customer { Id = 1, Name = "John Doe", Address = "123 Elm St" },
-    new Customer { Id = 2, Name = "Jane Smith", Address = "456 Oak St" },
-    new Customer { Id = 3, Name = "Sarah Johnson", Address = "789 Pine St" }
+List<Customer> customers = new List<Customer>
+{
+    new Customer
+    {
+        Id = 1,
+        Name = "John Doe",
+        Address = "123 Elm St"
+    },
+    new Customer
+    {
+        Id = 2,
+        Name = "Jane Smith",
+        Address = "456 Oak St"
+    },
+    new Customer
+    {
+        Id = 3,
+        Name = "Sarah Johnson",
+        Address = "789 Pine St"
+    }
 };
-List<Employee> employees = new List<Employee> {
-    new Employee { Id = 1, Name = "Alice Brown", Specialty = "Plumbing" },
-    new Employee { Id = 2, Name = "Bob White", Specialty = "Electrical" }
+
+List<Employee> employees = new List<Employee>
+{
+    new Employee
+    {
+        Id = 1,
+        Name = "Alice Brown",
+        Specialty = "Plumbing"
+    },
+    new Employee
+    {
+        Id = 2,
+        Name = "Bob White",
+        Specialty = "Electrical"
+    }
 };
-List<ServiceTicket> serviceTickets = new List<ServiceTicket> {
-    new ServiceTicket { Id = 1, CustomerId = 1, EmployeeId = 1, Description = "Leaky faucet", Emergency = false, DateCompleted = DateTime.Now.AddDays(-2) },
-    new ServiceTicket { Id = 2, CustomerId = 1, EmployeeId = 2, Description = "Broken light fixture", Emergency = true },
-    new ServiceTicket { Id = 3, CustomerId = 2, EmployeeId = 1, Description = "Clogged drain", Emergency = false, DateCompleted = DateTime.Now.AddDays(-1) },
-    new ServiceTicket { Id = 4, CustomerId = 3, Description = "Malfunctioning thermostat", Emergency = true },
-    new ServiceTicket { Id = 5, CustomerId = 2, Description = "General maintenance", Emergency = false }
+
+List<ServiceTicket> serviceTickets = new List<ServiceTicket>
+{
+    new ServiceTicket
+    {
+        Id = 1,
+        CustomerId = 1,
+        EmployeeId = 1,
+        Description = "Leaky faucet",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-2)
+    },
+    new ServiceTicket
+    {
+        Id = 2,
+        CustomerId = 1,
+        EmployeeId = 2,
+        Description = "Broken light fixture",
+        Emergency = true
+    },
+    new ServiceTicket
+    {
+        Id = 3,
+        CustomerId = 2,
+        EmployeeId = 1,
+        Description = "Clogged drain",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-1)
+    },
+    new ServiceTicket
+    {
+        Id = 4,
+        CustomerId = 3,
+        Description = "Malfunctioning thermostat",
+        Emergency = true
+    },
+    new ServiceTicket
+    {
+        Id = 5,
+        CustomerId = 2,
+        Description = "General maintenance",
+        Emergency = false
+    }
 };
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -35,8 +101,14 @@ app.UseHttpsRedirection();
 
 app.MapGet("/servicetickets", () =>
 {
+    foreach (var ticket in serviceTickets)
+    {
+        ticket.Customer = customers.FirstOrDefault(c => c.Id == ticket.CustomerId);
+        ticket.Employee = employees.FirstOrDefault(e => e.Id == ticket.EmployeeId);
+    }
     return serviceTickets;
 });
+
 
 
 app.MapGet("/servicetickets/{id}", (int id) =>
@@ -92,6 +164,50 @@ app.MapGet("/customers/{id}", (int id) =>
 
     return Results.Ok(customer);
 });
+
+    // Explanations for updating a service ticket.
+app.MapPut("/servicetickets/{id}", (int id, ServiceTicket serviceTicket) =>
+{
+    // Find the service ticket in the list that matches the given ID.
+    ServiceTicket ticketToUpdate = serviceTickets.FirstOrDefault(st => st.Id == id);
+
+    // Get the index of the ticket to update in the list.
+    int ticketIndex = serviceTickets.IndexOf(ticketToUpdate);
+
+    // Check if the service ticket was found. If not, return a 'NotFound' result.
+    if (ticketToUpdate == null)
+    {
+        return Results.NotFound();
+    }
+
+    // Ensure the ID in the URL matches the ID in the request body. If not, return a 'BadRequest'.
+    if (id != serviceTicket.Id)
+    {
+        return Results.BadRequest();
+    }
+
+    // Replace the old service ticket in the list with the updated one from the request.
+    serviceTickets[ticketIndex] = serviceTicket;
+
+    // Return an 'Ok' result indicating the update was successful.
+    return Results.Ok();
+});
+
+app.MapPost("/servicetickets/{id}/complete", (int id) =>
+{
+    ServiceTicket ticketToComplete = serviceTickets.FirstOrDefault(st => st.Id == id);
+
+    if (ticketToComplete == null)
+    {
+        return Results.NotFound();
+    }
+
+    ticketToComplete.DateCompleted = DateTime.Today;
+
+    return Results.Ok(ticketToComplete);
+});
+
+
 
 app.Run();
 
