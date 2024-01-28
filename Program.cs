@@ -211,7 +211,10 @@ app.MapGet("/servicetickets/emergencies", () =>
 {
     return serviceTickets.Where(ticket => ticket.Emergency).ToList();
 });
-
+app.MapGet("/servicetickets/unassigned", () =>
+{
+    return serviceTickets.Where(ticket => ticket.EmployeeId == null || ticket.EmployeeId == 0).ToList();
+});
 
 
 
