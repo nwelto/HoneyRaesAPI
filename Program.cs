@@ -18,6 +18,12 @@ List<Customer> customers = new List<Customer>
         Id = 3,
         Name = "Sarah Johnson",
         Address = "789 Pine St"
+    },
+    new Customer
+    {
+    Id = 4,
+    Name = "Emily White",
+    Address = "1010 Maple Lane"
     }
 };
 
@@ -46,7 +52,7 @@ List<ServiceTicket> serviceTickets = new List<ServiceTicket>
         EmployeeId = 1,
         Description = "Leaky faucet",
         Emergency = false,
-        DateCompleted = DateTime.Now.AddDays(-2)
+        DateCompleted = DateTime.Now.AddMonths(-6) 
     },
     new ServiceTicket
     {
@@ -54,7 +60,9 @@ List<ServiceTicket> serviceTickets = new List<ServiceTicket>
         CustomerId = 1,
         EmployeeId = 2,
         Description = "Broken light fixture",
-        Emergency = true
+        Emergency = true,
+        DateCompleted = null
+        
     },
     new ServiceTicket
     {
@@ -63,23 +71,91 @@ List<ServiceTicket> serviceTickets = new List<ServiceTicket>
         EmployeeId = 1,
         Description = "Clogged drain",
         Emergency = false,
-        DateCompleted = DateTime.Now.AddDays(-1)
+        DateCompleted = DateTime.Now.AddYears(-2) 
     },
     new ServiceTicket
     {
         Id = 4,
         CustomerId = 3,
+        EmployeeId = 2,
         Description = "Malfunctioning thermostat",
-        Emergency = true
+        Emergency = true,
+        DateCompleted = DateTime.Now.AddDays(-10) 
     },
     new ServiceTicket
     {
         Id = 5,
+        CustomerId = 3,
+        EmployeeId = 2,
+        Description = "AC maintenance",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddYears(-1).AddDays(-1) 
+    },
+    new ServiceTicket
+    {
+        Id = 6,
         CustomerId = 2,
-        Description = "General maintenance",
-        Emergency = false
+        EmployeeId = 1,
+        Description = "Pipe repair",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-20) 
+    },
+        new ServiceTicket
+    {
+        Id = 7,
+        CustomerId = 4,
+        EmployeeId = 1,
+        Description = "Old Completed Task",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddYears(-2) 
+    },
+            new ServiceTicket
+    {
+        Id = 8,
+        CustomerId = 2,
+        EmployeeId = 1,
+        Description = "Furnace inspection",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-1) 
+    },
+    new ServiceTicket
+    {
+        Id = 9,
+        CustomerId = 3,
+        EmployeeId = 2,
+        Description = "Window leak repair",
+        Emergency = true,
+        DateCompleted = DateTime.Now.AddDays(-15) 
+    },
+    new ServiceTicket
+    {
+        Id = 10,
+        CustomerId = 1,
+        EmployeeId = 1,
+        Description = "Garage door malfunction",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-7) 
+    },
+    new ServiceTicket
+    {
+        Id = 11,
+        CustomerId = 4,
+        EmployeeId = 2,
+        Description = "Gutter cleaning",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-20) 
+    },
+    new ServiceTicket
+    {
+        Id = 12,
+        CustomerId = 2,
+        EmployeeId = 1,
+        Description = "Heating system maintenance",
+        Emergency = false,
+        DateCompleted = DateTime.Now.AddDays(-25) 
     }
 };
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -214,6 +290,61 @@ app.MapGet("/servicetickets/emergencies", () =>
 app.MapGet("/servicetickets/unassigned", () =>
 {
     return serviceTickets.Where(ticket => ticket.EmployeeId == null || ticket.EmployeeId == 0).ToList();
+});
+
+app.MapGet("/customers/inactive", () =>
+{
+    var oneYearAgo = DateTime.Today.AddYears(-1);
+
+    var inactiveCustomers = customers.Where(customer =>
+        !serviceTickets.Any(ticket => ticket.CustomerId == customer.Id &&
+                                      ticket.DateCompleted > oneYearAgo)).ToList();
+
+    return inactiveCustomers;
+});
+
+app.MapGet("/employees/available", () => 
+{
+
+    var openTickets = serviceTickets.Where(t => t.DateCompleted == null);
+
+    var assignedEmployeeIds = openTickets.Select(t => t.EmployeeId).ToList();
+
+    var availableEmployees = employees.Where(e => !assignedEmployeeIds.Contains(e.Id));
+
+    return availableEmployees;
+
+});
+app.MapGet("/employees/{id}/customers", (int id) =>
+{
+    var ticketsForEmployee = serviceTickets.Where(st => st.EmployeeId == id).ToList();
+
+    var customerIds = ticketsForEmployee.Select(st => st.CustomerId).Distinct();
+
+    var customersForEmployee = customers.Where(c => customerIds.Contains(c.Id)).ToList();
+
+    return customersForEmployee;
+});
+
+app.MapGet("/employee/eotm", () =>
+{
+    DateTime lastMonth = DateTime.Now.AddMonths(-1);
+    Employee employeeOfMonth = employees.OrderByDescending(e => serviceTickets.Count(st => st.EmployeeId == e.Id && st.DateCompleted.HasValue && st.DateCompleted.Value.Month == lastMonth.Month && st.DateCompleted.Value.Year == lastMonth.Year)).FirstOrDefault();
+
+    return Results.Ok(employeeOfMonth);
+});
+
+app.MapGet("/servicetickets/review", () =>
+{
+    List<ServiceTicket> completedTickets = serviceTickets.Where(st => st.DateCompleted.HasValue).OrderBy(st => st.DateCompleted).ToList();
+
+    foreach (var ticket in completedTickets)
+    {
+        ticket.Customer = customers.FirstOrDefault(c => c.Id == ticket.CustomerId);
+        ticket.Employee = employees.FirstOrDefault(e => e.Id == ticket.EmployeeId);
+    }
+
+    return Results.Ok(completedTickets);
 });
 
 
