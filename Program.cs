@@ -1,4 +1,6 @@
 using HoneyRaesAPI.Models;
+
+
 List<Customer> customers = new List<Customer>
 {
     new Customer
@@ -163,6 +165,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
+});
 
 var app = builder.Build();
 
@@ -175,178 +181,81 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/servicetickets", () =>
-{
-    foreach (var ticket in serviceTickets)
-    {
-        ticket.Customer = customers.FirstOrDefault(c => c.Id == ticket.CustomerId);
-        ticket.Employee = employees.FirstOrDefault(e => e.Id == ticket.EmployeeId);
-    }
-    return serviceTickets;
-});
+app.MapGet("/api/servicetickets", () => Results.Ok(serviceTickets));
 
-
-
-app.MapGet("/servicetickets/{id}", (int id) =>
+app.MapGet("/api/servicetickets/{id}", (int id) =>
 {
     ServiceTicket serviceTicket = serviceTickets.FirstOrDefault(st => st.Id == id);
     if (serviceTicket == null)
     {
         return Results.NotFound();
     }
-    serviceTicket.Employee = employees.FirstOrDefault(e => e.Id == serviceTicket.EmployeeId);
-    serviceTicket.Customer = customers.FirstOrDefault(c => c.Id == serviceTicket.CustomerId);
+
+    serviceTicket.Employee = employees
+        .Where(e => e.Id == serviceTicket.EmployeeId)
+        .Select(e => new Employee { Id = e.Id, Name = e.Name, Specialty = e.Specialty })
+        .FirstOrDefault();
+
+    serviceTicket.Customer = customers
+        .Where(c => c.Id == serviceTicket.CustomerId)
+        .Select(c => new Customer { Id = c.Id, Name = c.Name, Address = c.Address })
+        .FirstOrDefault();
 
     return Results.Ok(serviceTicket);
 });
 
-app.MapPost("/servicetickets", (ServiceTicket serviceTicket) =>
+
+app.MapPost("/api/servicetickets", (ServiceTicket serviceTicket) =>
 {
-    serviceTicket.Id = serviceTickets.Max(st => st.Id) + 1;
+    serviceTicket.Id = serviceTickets.Any() ? serviceTickets.Max(st => st.Id) + 1 : 1;
     serviceTickets.Add(serviceTicket);
-    return serviceTicket;
+    return Results.Created($"/api/servicetickets/{serviceTicket.Id}", serviceTicket);
 });
 
-app.MapDelete("/servicetickets/{id}", (int id) =>
+app.MapDelete("/api/servicetickets/{id}", (int id) =>
 {
     var serviceTicket = serviceTickets.FirstOrDefault(st => st.Id == id);
-    if (serviceTicket != null)
-    {
-        serviceTickets.Remove(serviceTicket);
-    }
+    if (serviceTicket == null) return Results.NotFound();
+
+    serviceTickets.Remove(serviceTicket);
+    return Results.Ok(new { message = "Service ticket deleted successfully." });
 });
 
-
-app.MapGet("/employees/{id}", (int id) =>
+app.MapPut("/api/servicetickets/{id}", (int id, ServiceTicket updatedTicket) =>
 {
-    Employee employee = employees.FirstOrDefault(e => e.Id == id);
-    if (employee == null)
-    {
-        return Results.NotFound();
-    }
+    var ticketToUpdate = serviceTickets.FirstOrDefault(st => st.Id == id);
+    if (ticketToUpdate == null) return Results.NotFound();
+    if (id != updatedTicket.Id) return Results.BadRequest(new { message = "Ticket ID mismatch." });
+
+
+    ticketToUpdate.Description = updatedTicket.Description;
+    ticketToUpdate.Emergency = updatedTicket.Emergency;
+ 
+
+    return Results.Ok(ticketToUpdate);
+});
+
+app.MapGet("/api/employees", () => Results.Ok(employees));
+
+app.MapGet("/api/employees/{id}", (int id) =>
+{
+    var employee = employees.FirstOrDefault(e => e.Id == id);
+    if (employee == null) return Results.NotFound();
     employee.ServiceTickets = serviceTickets.Where(st => st.EmployeeId == id).ToList();
 
     return Results.Ok(employee);
 });
 
-app.MapGet("/customers/{id}", (int id) =>
+app.MapGet("/api/customers", () => Results.Ok(customers));
+
+app.MapGet("/api/customers/{id}", (int id) =>
 {
-    Customer customer = customers.FirstOrDefault(e => e.Id == id);
-    if (customer == null)
-    {
-        return Results.NotFound();
-    }
+    var customer = customers.FirstOrDefault(c => c.Id == id);
+    if (customer == null) return Results.NotFound();
     customer.ServiceTickets = serviceTickets.Where(st => st.CustomerId == id).ToList();
 
     return Results.Ok(customer);
 });
-
-    // Explanations for updating a service ticket.
-app.MapPut("/servicetickets/{id}", (int id, ServiceTicket serviceTicket) =>
-{
-    // Find the service ticket in the list that matches the given ID.
-    ServiceTicket ticketToUpdate = serviceTickets.FirstOrDefault(st => st.Id == id);
-
-    // Get the index of the ticket to update in the list.
-    int ticketIndex = serviceTickets.IndexOf(ticketToUpdate);
-
-    // Check if the service ticket was found. If not, return a 'NotFound' result.
-    if (ticketToUpdate == null)
-    {
-        return Results.NotFound();
-    }
-
-    // Ensure the ID in the URL matches the ID in the request body. If not, return a 'BadRequest'.
-    if (id != serviceTicket.Id)
-    {
-        return Results.BadRequest();
-    }
-
-    // Replace the old service ticket in the list with the updated one from the request.
-    serviceTickets[ticketIndex] = serviceTicket;
-
-    // Return an 'Ok' result indicating the update was successful.
-    return Results.Ok();
-});
-
-app.MapPost("/servicetickets/{id}/complete", (int id) =>
-{
-    ServiceTicket ticketToComplete = serviceTickets.FirstOrDefault(st => st.Id == id);
-
-    if (ticketToComplete == null)
-    {
-        return Results.NotFound();
-    }
-
-    ticketToComplete.DateCompleted = DateTime.Today;
-
-    return Results.Ok(ticketToComplete);
-});
-
-app.MapGet("/servicetickets/emergencies", () =>
-{
-    return serviceTickets.Where(ticket => ticket.Emergency).ToList();
-});
-app.MapGet("/servicetickets/unassigned", () =>
-{
-    return serviceTickets.Where(ticket => ticket.EmployeeId == null || ticket.EmployeeId == 0).ToList();
-});
-
-app.MapGet("/customers/inactive", () =>
-{
-    var oneYearAgo = DateTime.Today.AddYears(-1);
-
-    var inactiveCustomers = customers.Where(customer =>
-        !serviceTickets.Any(ticket => ticket.CustomerId == customer.Id &&
-                                      ticket.DateCompleted > oneYearAgo)).ToList();
-
-    return inactiveCustomers;
-});
-
-app.MapGet("/employees/available", () => 
-{
-
-    var openTickets = serviceTickets.Where(t => t.DateCompleted == null);
-
-    var assignedEmployeeIds = openTickets.Select(t => t.EmployeeId).ToList();
-
-    var availableEmployees = employees.Where(e => !assignedEmployeeIds.Contains(e.Id));
-
-    return availableEmployees;
-
-});
-app.MapGet("/employees/{id}/customers", (int id) =>
-{
-    var ticketsForEmployee = serviceTickets.Where(st => st.EmployeeId == id).ToList();
-
-    var customerIds = ticketsForEmployee.Select(st => st.CustomerId).Distinct();
-
-    var customersForEmployee = customers.Where(c => customerIds.Contains(c.Id)).ToList();
-
-    return customersForEmployee;
-});
-
-app.MapGet("/employee/eotm", () =>
-{
-    DateTime lastMonth = DateTime.Now.AddMonths(-1);
-    Employee employeeOfMonth = employees.OrderByDescending(e => serviceTickets.Count(st => st.EmployeeId == e.Id && st.DateCompleted.HasValue && st.DateCompleted.Value.Month == lastMonth.Month && st.DateCompleted.Value.Year == lastMonth.Year)).FirstOrDefault();
-
-    return Results.Ok(employeeOfMonth);
-});
-
-app.MapGet("/servicetickets/review", () =>
-{
-    List<ServiceTicket> completedTickets = serviceTickets.Where(st => st.DateCompleted.HasValue).OrderBy(st => st.DateCompleted).ToList();
-
-    foreach (var ticket in completedTickets)
-    {
-        ticket.Customer = customers.FirstOrDefault(c => c.Id == ticket.CustomerId);
-        ticket.Employee = employees.FirstOrDefault(e => e.Id == ticket.EmployeeId);
-    }
-
-    return Results.Ok(completedTickets);
-});
-
 
 
 
